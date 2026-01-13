@@ -14,35 +14,33 @@ model User {
   email              String   @unique
   password           String
   phone              String?
-  status             String   @default("active") // active, suspended, pending
-  role               String   @default("user") // user, admin
-  verificationStatus String   @default("unverified") // verified, unverified, pending
+  status             String   @default("active")
+  role               String   @default("user")
+  verificationStatus String   @default("unverified")
   totalOrders        Int      @default(0)
   totalVolume        Float    @default(0)
   joinedAt           DateTime @default(now())
   lastActive         DateTime @default(now())
-
   orders             Order[]
 
   @@map("users")
 }
 
 model Currency {
-  id        String   @id @default(cuid())
-  code      String   @unique
-  name      String
-  symbol    String
-  flag      String
-  type      String // fiat, crypto
-  decimals  Int      @default(2)
-  active    Boolean  @default(true)
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  ordersFrom Order[] @relation("FromCurrency")
-  ordersTo   Order[] @relation("ToCurrency")
-  ratesFrom  ExchangeRate[] @relation("FromCurrencyRate")
-  ratesTo    ExchangeRate[] @relation("ToCurrencyRate")
+  id             String          @id @default(cuid())
+  code           String          @unique
+  name           String
+  symbol         String
+  flag           String
+  type           String
+  decimals       Int             @default(2)
+  active         Boolean         @default(true)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  ratesFrom      ExchangeRate[]  @relation("FromCurrencyRate")
+  ratesTo        ExchangeRate[]  @relation("ToCurrencyRate")
+  ordersFrom     Order[]         @relation("FromCurrency")
+  ordersTo       Order[]         @relation("ToCurrency")
   paymentMethods PaymentMethod[]
 
   @@map("currencies")
@@ -58,7 +56,6 @@ model ExchangeRate {
   lastUpdated    DateTime @default(now())
   autoUpdate     Boolean  @default(false)
   active         Boolean  @default(true)
-
   fromCurrency   Currency @relation("FromCurrencyRate", fields: [fromCurrencyId], references: [id], onDelete: Cascade)
   toCurrency     Currency @relation("ToCurrencyRate", fields: [toCurrencyId], references: [id], onDelete: Cascade)
 
@@ -69,60 +66,49 @@ model ExchangeRate {
 model PaymentMethod {
   id            String   @id @default(cuid())
   name          String
-  type          String // bank, crypto
+  type          String
   currencyId    String
   active        Boolean  @default(true)
-
-  // Bank fields
   bankName      String?
   accountName   String?
   accountNumber String?
   routingNumber String?
   swift         String?
   iban          String?
-
-  // Crypto fields
   walletAddress String?
   network       String?
-
   instructions  String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
-
-  currency      Currency @relation(fields: [currencyId], references: [id], onDelete: Cascade)
   orders        Order[]
+  currency      Currency @relation(fields: [currencyId], references: [id], onDelete: Cascade)
 
   @@map("payment_methods")
 }
 
 model Order {
-  id                     String   @id @default(cuid())
+  id                     String        @id @default(cuid())
   userId                 String
   fromCurrencyId         String
   fromAmount             Float
   toCurrencyId           String
   toAmount               Float
-  status                 String   @default("pending_payment") // pending_payment, payment_received, processing, completed, failed, cancelled
+  status                 String        @default("pending_payment")
   paymentMethodId        String
-
-  // Recipient details
   recipientName          String?
   recipientBank          String?
   recipientAccountNumber String?
   recipientSwift         String?
   recipientWalletAddress String?
-
   exchangeRate           Float
   fee                    Float
   notes                  String?
-
-  createdAt              DateTime @default(now())
-  updatedAt              DateTime @updatedAt
-
-  user                   User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  fromCurrency           Currency @relation("FromCurrency", fields: [fromCurrencyId], references: [id])
-  toCurrency             Currency @relation("ToCurrency", fields: [toCurrencyId], references: [id])
+  createdAt              DateTime      @default(now())
+  updatedAt              DateTime      @updatedAt
+  fromCurrency           Currency      @relation("FromCurrency", fields: [fromCurrencyId], references: [id])
   paymentMethod          PaymentMethod @relation(fields: [paymentMethodId], references: [id])
+  toCurrency             Currency      @relation("ToCurrency", fields: [toCurrencyId], references: [id])
+  user                   User          @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("orders")
 }
