@@ -1,6 +1,7 @@
 generator client {
   provider = "prisma-client-js"
-  output   = "../src/generated/prisma"
+  // Use default output location (node_modules/.prisma/client)
+  // This works better with TypeScript compilation and Railway deployment
 }
 
 datasource db {

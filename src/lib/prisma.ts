@@ -1,6 +1,4 @@
-import { PrismaClient } from "../generated/prisma";
-
-// import { PrismaClient } from "@prisma/client";
+import { PrismaClient } from "@prisma/client";
 
 // Create a single instance of PrismaClient to be reused
 const prisma = new PrismaClient({
