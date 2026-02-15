@@ -1,19 +1,11 @@
-import { Router, Request, Response } from "express";
+import { Request, Response } from "express";
 import prisma from "../lib/prisma";
 import { Webhook } from "svix";
 
-const router = Router();
-
 /**
- * POST /api/webhooks/clerk
- * Webhook to sync user changes from Clerk to database
- *
- * Handles events:
- * - user.created
- * - user.updated
- * - user.deleted
+ * Handle Clerk webhooks to sync user changes to database
  */
-router.post("/clerk", async (req: Request, res: Response) => {
+export const handleClerkWebhook = async (req: Request, res: Response) => {
   try {
     // Get the webhook secret from environment
     const WEBHOOK_SECRET = process.env.CLERK_WEBHOOK_SECRET;
@@ -114,11 +106,6 @@ router.post("/clerk", async (req: Request, res: Response) => {
             },
           });
 
-          // Option 2: Hard delete (uncomment if you want to actually delete)
-          // await prisma.user.delete({
-          //   where: { email },
-          // });
-
           console.log(`User deleted: ${userData.id}`);
         }
         break;
@@ -139,6 +126,4 @@ router.post("/clerk", async (req: Request, res: Response) => {
       error: error.message,
     });
   }
-});
-
-export default router;
+};

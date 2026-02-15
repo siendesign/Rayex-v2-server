@@ -1,13 +1,11 @@
-import { Router, Request, Response } from "express";
+import { Request, Response } from "express";
 import prisma from "../lib/prisma";
-
-const router = Router();
+import sseManager from "../lib/sse";
 
 /**
- * POST /api/users/sync
  * Sync user from Clerk to database (upsert)
  */
-router.post("/sync", async (req: Request, res: Response) => {
+export const syncUser = async (req: Request, res: Response) => {
   try {
     const { clerkId, name, email, phone, role, metadata } = req.body;
 
@@ -42,6 +40,9 @@ router.post("/sync", async (req: Request, res: Response) => {
       },
     });
 
+    // Broadcast user event to admins
+    sseManager.broadcast('admins', 'user_updated', user);
+
     return res.json({
       success: true,
       data: user,
@@ -54,13 +55,12 @@ router.post("/sync", async (req: Request, res: Response) => {
       error: error.message,
     });
   }
-});
+};
 
 /**
- * GET /api/users
  * Get all users with pagination and filters
  */
-router.get("/", async (req: Request, res: Response) => {
+export const getUsers = async (req: Request, res: Response) => {
   try {
     const {
       page = 1,
@@ -133,13 +133,12 @@ router.get("/", async (req: Request, res: Response) => {
       error: error.message,
     });
   }
-});
+};
 
 /**
- * GET /api/users/:id
  * Get single user by ID
  */
-router.get("/:id", async (req: Request, res: Response) => {
+export const getUserById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -172,13 +171,12 @@ router.get("/:id", async (req: Request, res: Response) => {
       error: error.message,
     });
   }
-});
+};
 
 /**
- * PUT /api/users/:id/status
  * Update user status
  */
-router.put("/:id/status", async (req: Request, res: Response) => {
+export const updateUserStatus = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { status } = req.body;
@@ -195,6 +193,9 @@ router.put("/:id/status", async (req: Request, res: Response) => {
       data: { status },
     });
 
+    // Broadcast user event to admins
+    sseManager.broadcast('admins', 'user_updated', user);
+
     return res.json({
       success: true,
       data: user,
@@ -207,6 +208,4 @@ router.put("/:id/status", async (req: Request, res: Response) => {
       error: error.message,
     });
   }
-});
-
-export default router;
+};

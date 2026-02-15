@@ -33,6 +33,7 @@ model Currency {
   name           String
   symbol         String
   flag           String
+  flagUrl        String?
   type           String
   decimals       Int             @default(2)
   active         Boolean         @default(true)
@@ -52,6 +53,7 @@ model ExchangeRate {
   fromCurrencyId String
   toCurrencyId   String
   rate           Float
+  previousRate   Float?
   buyRate        Float
   sellRate       Float
   lastUpdated    DateTime @default(now())

@@ -1,14 +1,11 @@
-import { Router, Request, Response } from "express";
+import { Request, Response } from "express";
 import prisma from "../lib/prisma";
 import { clerkClient } from "@clerk/clerk-sdk-node";
 
-const router = Router();
-
 /**
- * PUT /api/admin/users/:id/suspend
  * Suspend a user in both Clerk and Database
  */
-router.put("/users/:id/suspend", async (req: Request, res: Response) => {
+export const suspendUser = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -71,13 +68,12 @@ router.put("/users/:id/suspend", async (req: Request, res: Response) => {
       error: error.message,
     });
   }
-});
+};
 
 /**
- * PUT /api/admin/users/:id/activate
  * Activate a suspended user in both Clerk and Database
  */
-router.put("/users/:id/activate", async (req: Request, res: Response) => {
+export const activateUser = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -140,13 +136,12 @@ router.put("/users/:id/activate", async (req: Request, res: Response) => {
       error: error.message,
     });
   }
-});
+};
 
 /**
- * PUT /api/admin/users/:id/role
  * Update user role in both Clerk and Database
  */
-router.put("/users/:id/role", async (req: Request, res: Response) => {
+export const updateUserRole = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
     const { role } = req.body;
@@ -216,13 +211,12 @@ router.put("/users/:id/role", async (req: Request, res: Response) => {
       error: error.message,
     });
   }
-});
+};
 
 /**
- * DELETE /api/admin/users/:id
  * Delete user from both Clerk and Database
  */
-router.delete("/users/:id", async (req: Request, res: Response) => {
+export const deleteUser = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
 
@@ -275,6 +269,4 @@ router.delete("/users/:id", async (req: Request, res: Response) => {
       error: error.message,
     });
   }
-});
-
-export default router;
+};
