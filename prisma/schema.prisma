@@ -1,7 +1,5 @@
 generator client {
   provider = "prisma-client-js"
-  // Use default output location (node_modules/.prisma/client)
-  // This works better with TypeScript compilation and Railway deployment
 }
 
 datasource db {
@@ -41,12 +39,12 @@ model Currency {
   name           String
   symbol         String
   flag           String
-  flagUrl        String?
   type           String
   decimals       Int             @default(2)
   active         Boolean         @default(true)
   createdAt      DateTime        @default(now())
   updatedAt      DateTime        @updatedAt
+  flagUrl        String?
   ratesFrom      ExchangeRate[]  @relation("FromCurrencyRate")
   ratesTo        ExchangeRate[]  @relation("ToCurrencyRate")
   ordersFrom     Order[]         @relation("FromCurrency")
@@ -61,12 +59,12 @@ model ExchangeRate {
   fromCurrencyId String
   toCurrencyId   String
   rate           Float
-  previousRate   Float?
   buyRate        Float
   sellRate       Float
   lastUpdated    DateTime @default(now())
   autoUpdate     Boolean  @default(false)
   active         Boolean  @default(true)
+  previousRate   Float?
   fromCurrency   Currency @relation("FromCurrencyRate", fields: [fromCurrencyId], references: [id], onDelete: Cascade)
   toCurrency     Currency @relation("ToCurrencyRate", fields: [toCurrencyId], references: [id], onDelete: Cascade)
 
@@ -88,10 +86,10 @@ model PaymentMethod {
   iban          String?
   walletAddress String?
   network       String?
-  qrCodeUrl     String?
   instructions  String?
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
+  qrCodeUrl     String?
   orders        Order[]
   currency      Currency @relation(fields: [currencyId], references: [id], onDelete: Cascade)
 
@@ -112,12 +110,12 @@ model Order {
   recipientAccountNumber String?
   recipientSwift         String?
   recipientWalletAddress String?
-  recipientQrCodeUrl     String?
   exchangeRate           Float
   fee                    Float
   notes                  String?
   createdAt              DateTime      @default(now())
   updatedAt              DateTime      @updatedAt
+  recipientQrCodeUrl     String?
   fromCurrency           Currency      @relation("FromCurrency", fields: [fromCurrencyId], references: [id])
   paymentMethod          PaymentMethod @relation(fields: [paymentMethodId], references: [id])
   toCurrency             Currency      @relation("ToCurrency", fields: [toCurrencyId], references: [id])

@@ -6,8 +6,15 @@ const storage = multer.memoryStorage();
 
 // File filter to only allow images
 const fileFilter = (req: any, file: any, cb: any) => {
+  if (!file || !file.originalname) {
+    // If no file is provided, skip file validation and let the controller handle it
+    return cb(null, true);
+  }
+
   const allowedFileTypes = /jpeg|jpg|png|webp|gif/;
-  const extname = allowedFileTypes.test(path.extname(file.originalname).toLowerCase());
+  const extname = allowedFileTypes.test(
+    path.extname(file.originalname).toLowerCase(),
+  );
   const mimetype = allowedFileTypes.test(file.mimetype);
 
   if (extname && mimetype) {

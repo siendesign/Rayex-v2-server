@@ -55,6 +55,12 @@ app.use(
   }),
 );
 
+// Middleware MUST run before routes
+app.use(compression()); // Compress regular JSON responses
+app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev")); // HTTP request logger
+app.use(express.json()); // Parse JSON bodies
+app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
+
 // SSE Endpoint (Move it here, before compression/morgan)
 import sseManager from "./lib/sse";
 app.get("/api/realtime/sse", (req: Request, res: Response): void => {
@@ -89,11 +95,6 @@ app.get("/api/realtime/sse", (req: Request, res: Response): void => {
   const clientId = email || `admin_${Math.random().toString(36).substr(2, 9)}`;
   sseManager.addClient(clientId, res, rooms);
 });
-
-app.use(compression()); // Compress regular JSON responses
-app.use(morgan(process.env.NODE_ENV === "production" ? "combined" : "dev")); // HTTP request logger
-app.use(express.json()); // Parse JSON bodies
-app.use(express.urlencoded({ extended: true })); // Parse URL-encoded bodies
 
 // Health check endpoint
 app.get("/", (req: Request, res: Response) => {
