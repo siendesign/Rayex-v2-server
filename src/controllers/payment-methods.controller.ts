@@ -1,5 +1,6 @@
 import { Request, Response } from "express";
 import prisma from "../lib/prisma";
+import { uploadImage } from "../lib/cloudinary";
 
 /**
  * Get all payment methods
@@ -82,6 +83,7 @@ export const createPaymentMethod = async (req: Request, res: Response) => {
       network,
       instructions,
     } = req.body;
+    let qrCodeUrl = null;
 
     if (!name || !type || !currencyId) {
       return res.status(400).json({
@@ -90,21 +92,31 @@ export const createPaymentMethod = async (req: Request, res: Response) => {
       });
     }
 
+    // Handle file upload to Cloudinary
+    if ((req as any).file) {
+      const file = (req as any).file;
+      const fileBase64 = `data:${file.mimetype};base64,${file.buffer.toString("base64")}`;
+      const uploadResult = await uploadImage(fileBase64);
+      qrCodeUrl = uploadResult.secure_url;
+    }
+
     const method = await prisma.paymentMethod.create({
       data: {
         name,
         type,
         currencyId,
-        active: active !== undefined ? active : true,
-        bankName,
-        accountName,
-        accountNumber,
-        routingNumber,
-        swift,
-        iban,
-        walletAddress,
-        network,
-        instructions,
+        active:
+          active !== undefined ? active === "true" || active === true : true,
+        bankName: bankName || null,
+        accountName: accountName || null,
+        accountNumber: accountNumber || null,
+        routingNumber: routingNumber || null,
+        swift: swift || null,
+        iban: iban || null,
+        walletAddress: walletAddress || null,
+        network: network || null,
+        qrCodeUrl: qrCodeUrl || null,
+        instructions: instructions || null,
       },
     });
 
@@ -144,23 +156,41 @@ export const updatePaymentMethod = async (req: Request, res: Response) => {
       network,
       instructions,
     } = req.body;
+    let qrCodeUrl = req.body.qrCodeUrl;
+
+    // Handle file upload to Cloudinary
+    if ((req as any).file) {
+      const file = (req as any).file;
+      const fileBase64 = `data:${file.mimetype};base64,${file.buffer.toString("base64")}`;
+      const uploadResult = await uploadImage(fileBase64);
+      qrCodeUrl = uploadResult.secure_url;
+    }
 
     const method = await prisma.paymentMethod.update({
       where: { id },
       data: {
-        name,
-        type,
-        currencyId,
-        active,
-        bankName,
-        accountName,
-        accountNumber,
-        routingNumber,
-        swift,
-        iban,
-        walletAddress,
-        network,
-        instructions,
+        name: name || undefined,
+        type: type || undefined,
+        currencyId: currencyId || undefined,
+        active:
+          active !== undefined
+            ? active === "true" || active === true
+            : undefined,
+        bankName: bankName === undefined ? undefined : bankName || null,
+        accountName:
+          accountName === undefined ? undefined : accountName || null,
+        accountNumber:
+          accountNumber === undefined ? undefined : accountNumber || null,
+        routingNumber:
+          routingNumber === undefined ? undefined : routingNumber || null,
+        swift: swift === undefined ? undefined : swift || null,
+        iban: iban === undefined ? undefined : iban || null,
+        walletAddress:
+          walletAddress === undefined ? undefined : walletAddress || null,
+        network: network === undefined ? undefined : network || null,
+        qrCodeUrl: qrCodeUrl === undefined ? undefined : qrCodeUrl || null,
+        instructions:
+          instructions === undefined ? undefined : instructions || null,
       },
     });
 

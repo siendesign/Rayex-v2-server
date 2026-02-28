@@ -1,13 +1,19 @@
 import { Request, Response } from "express";
 import prisma from "../lib/prisma";
 import sseManager from "../lib/sse";
+import { sendEmail } from "../lib/mailer";
+import {
+  getWelcomeEmail,
+  getLoginNotificationEmail,
+} from "../lib/email-templates";
 
 /**
  * Sync user from Clerk to database (upsert)
  */
 export const syncUser = async (req: Request, res: Response) => {
   try {
-    const { clerkId, name, email, phone, role, metadata } = req.body;
+    const { clerkId, name, email, phone, role, metadata, triggerEmail } =
+      req.body;
 
     // Validate required fields
     if (!clerkId || !email || !name) {
@@ -41,7 +47,33 @@ export const syncUser = async (req: Request, res: Response) => {
     });
 
     // Broadcast user event to admins
-    sseManager.broadcast('admins', 'user_updated', user);
+    sseManager.broadcast("admins", "user_updated", user);
+
+    // Send Login Notification Email
+    try {
+      const isNewUser = user.joinedAt.getTime() === user.lastActive.getTime();
+
+      if (isNewUser || triggerEmail) {
+        const subject = isNewUser ? "Welcome to RayEx!" : "New Login to RayEx";
+        const htmlBody = isNewUser
+          ? getWelcomeEmail(user.name)
+          : getLoginNotificationEmail(user.name, new Date().toLocaleString());
+
+        await sendEmail({
+          to: user.email,
+          subject,
+          html: htmlBody,
+        });
+        console.log(
+          `✉️ Login notification email sent successfully to ${user.email}`,
+        );
+      }
+    } catch (emailErr) {
+      console.error(
+        `⚠️ Failed to send login email to ${user.email}, but continuing...`,
+        emailErr,
+      );
+    }
 
     return res.json({
       success: true,
@@ -194,7 +226,7 @@ export const updateUserStatus = async (req: Request, res: Response) => {
     });
 
     // Broadcast user event to admins
-    sseManager.broadcast('admins', 'user_updated', user);
+    sseManager.broadcast("admins", "user_updated", user);
 
     return res.json({
       success: true,

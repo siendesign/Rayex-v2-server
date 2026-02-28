@@ -1,5 +1,6 @@
 import { Router } from "express";
 import * as paymentMethodsController from "../controllers/payment-methods.controller";
+import { upload } from "../middleware/upload.middleware";
 
 const router = Router();
 
@@ -19,13 +20,21 @@ router.get("/:id", paymentMethodsController.getPaymentMethodById);
  * POST /api/payment-methods
  * Create new payment method
  */
-router.post("/", paymentMethodsController.createPaymentMethod);
+router.post(
+  "/",
+  upload.single("qrCodeImage"),
+  paymentMethodsController.createPaymentMethod,
+);
 
 /**
  * PUT /api/payment-methods/:id
  * Update payment method
  */
-router.put("/:id", paymentMethodsController.updatePaymentMethod);
+router.put(
+  "/:id",
+  upload.single("qrCodeImage"),
+  paymentMethodsController.updatePaymentMethod,
+);
 
 /**
  * DELETE /api/payment-methods/:id

@@ -16,6 +16,7 @@ import currenciesRouter from "./routes/currencies.route";
 import ratesRouter from "./routes/exchange-rates.route";
 import methodsRouter from "./routes/payment-methods.route";
 import statsRouter from "./routes/stats.route";
+import settingsRouter from "./routes/settings.route";
 
 // Load environment variables
 dotenv.config();
@@ -27,14 +28,16 @@ const app: Application = express();
 const PORT = parseInt(process.env.PORT || "3003", 10);
 
 // CORS Configuration - Support multiple origins
-const allowedOrigins = process.env.CORS_ORIGIN?.split(',').map(o => o.trim()) || ['http://localhost:3000'];
+const allowedOrigins = process.env.CORS_ORIGIN?.split(",").map((o) =>
+  o.trim(),
+) || ["http://localhost:3000"];
 
 // Middleware
 app.use(
   helmet({
     crossOriginResourcePolicy: { policy: "cross-origin" },
     crossOriginOpenerPolicy: { policy: "same-origin-allow-popups" },
-  })
+  }),
 ); // Security headers with cross-origin support
 app.use(
   cors({
@@ -45,11 +48,11 @@ app.use(
       if (allowedOrigins.indexOf(origin) !== -1) {
         callback(null, true);
       } else {
-        callback(new Error('Not allowed by CORS'));
+        callback(new Error("Not allowed by CORS"));
       }
     },
     credentials: true,
-  })
+  }),
 );
 
 // SSE Endpoint (Move it here, before compression/morgan)
@@ -59,23 +62,25 @@ app.get("/api/realtime/sse", (req: Request, res: Response): void => {
   const role = req.query.role as string;
   const origin = req.headers.origin;
 
-  console.log(`🔌 SSE Request - Origin: ${origin}, Email: ${email}, Role: ${role}`);
+  console.log(
+    `🔌 SSE Request - Origin: ${origin}, Email: ${email}, Role: ${role}`,
+  );
 
   // Set explicit CORS for this route just in case
   if (origin && allowedOrigins.includes(origin)) {
-    res.setHeader('Access-Control-Allow-Origin', origin);
-    res.setHeader('Access-Control-Allow-Credentials', 'true');
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Credentials", "true");
   }
 
-  if (!email && role !== 'admin' && role !== 'public') {
+  if (!email && role !== "admin" && role !== "public") {
     console.warn(`⚠️ SSE Rejected: Missing email or valid role`);
     res.status(400).json({ error: "Email or valid role is required for SSE" });
     return;
   }
 
   const rooms: string[] = [];
-  if (role === 'admin') {
-    rooms.push('admins');
+  if (role === "admin") {
+    rooms.push("admins");
   }
   if (email) {
     rooms.push(`user_${email}`);
@@ -118,6 +123,7 @@ app.use("/api/currencies", currenciesRouter);
 app.use("/api/exchange-rates", ratesRouter);
 app.use("/api/payment-methods", methodsRouter);
 app.use("/api/stats", statsRouter);
+app.use("/api/settings", settingsRouter);
 
 // Create HTTP server
 const server = http.createServer(app);
@@ -128,7 +134,7 @@ initSocket(server);
 // Start server - Listen on 0.0.0.0 for Railway/production
 server.listen(PORT, "0.0.0.0", async () => {
   console.log(`🚀 Server is running on port ${PORT}`);
-  
+
   try {
     // Connect to external services
     await connectRedis();
@@ -139,7 +145,7 @@ server.listen(PORT, "0.0.0.0", async () => {
 
   console.log(`📡 Environment: ${process.env.NODE_ENV || "development"}`);
   console.log(`🔗 Health check available at /health`);
-  console.log(`✅ Allowed CORS origins: ${allowedOrigins.join(', ')}`);
+  console.log(`✅ Allowed CORS origins: ${allowedOrigins.join(", ")}`);
 });
 
 export default app;

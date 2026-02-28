@@ -1,5 +1,6 @@
 import { Router } from "express";
 import * as ordersController from "../controllers/orders.controller";
+import { upload } from "../middleware/upload.middleware";
 
 const router = Router();
 
@@ -25,7 +26,11 @@ router.get("/:id", ordersController.getOrderById);
  * POST /api/orders
  * Create a new order
  */
-router.post("/", ordersController.createOrder);
+router.post(
+  "/",
+  upload.single("recipientQrCodeImage"),
+  ordersController.createOrder,
+);
 
 /**
  * PUT /api/orders/:id/status

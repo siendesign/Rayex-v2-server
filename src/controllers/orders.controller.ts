@@ -1,20 +1,21 @@
 import { Request, Response } from "express";
 import prisma from "../lib/prisma";
+import { uploadImage } from "../lib/cloudinary";
 import { emitEvent } from "../lib/kafka";
 import { getIO } from "../lib/socket";
 import sseManager from "../lib/sse";
+import { sendEmail } from "../lib/mailer";
+import {
+  getOrderStatusUpdateEmail,
+  getOrderCreatedEmail,
+} from "../lib/email-templates";
 
 /**
  * Get all orders with pagination and filters
  */
 export const getOrders = async (req: Request, res: Response) => {
   try {
-    const {
-      page = 1,
-      limit = 10,
-      search = "",
-      status = "",
-    } = req.query;
+    const { page = 1, limit = 10, search = "", status = "" } = req.query;
 
     const skip = (Number(page) - 1) * Number(limit);
     const take = Number(limit);
@@ -26,7 +27,9 @@ export const getOrders = async (req: Request, res: Response) => {
       where.OR = [
         { id: { contains: search as string, mode: "insensitive" } },
         { user: { name: { contains: search as string, mode: "insensitive" } } },
-        { user: { email: { contains: search as string, mode: "insensitive" } } },
+        {
+          user: { email: { contains: search as string, mode: "insensitive" } },
+        },
       ];
     }
 
@@ -49,11 +52,11 @@ export const getOrders = async (req: Request, res: Response) => {
             id: true,
             name: true,
             email: true,
-          }
+          },
         },
         fromCurrency: true,
         toCurrency: true,
-      }
+      },
     });
 
     return res.json({
@@ -64,7 +67,7 @@ export const getOrders = async (req: Request, res: Response) => {
         limit: Number(limit),
         total,
         totalPages: Math.ceil(total / Number(limit)),
-      }
+      },
     });
   } catch (error: any) {
     console.error("Error fetching orders:", error);
@@ -90,7 +93,7 @@ export const getOrderById = async (req: Request, res: Response) => {
         fromCurrency: true,
         toCurrency: true,
         paymentMethod: true,
-      }
+      },
     });
 
     if (!order) {
@@ -128,7 +131,7 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
       "processing",
       "completed",
       "failed",
-      "cancelled"
+      "cancelled",
     ];
 
     if (!status || !validStatuses.includes(status)) {
@@ -149,20 +152,42 @@ export const updateOrderStatus = async (req: Request, res: Response) => {
         toCurrency: true,
         user: true,
         paymentMethod: true,
-      }
+      },
     });
 
     // Emit Kafka event, WebSocket update, and SSE update
-    await emitEvent('orders', 'ORDER_STATUS_UPDATED', order);
-    
+    await emitEvent("orders", "ORDER_STATUS_UPDATED", order);
+
     const userRoom = `user_${order.user.email}`;
     console.log(`📡 Emitting order_updated to admins and ${userRoom}`);
-    
+
     // Socket.io (legacy)
-    getIO().to('admins').to(userRoom).emit('order_updated', order);
-    
+    getIO().to("admins").to(userRoom).emit("order_updated", order);
+
     // SSE (new)
-    sseManager.broadcast(['admins', userRoom], 'order_updated', order);
+    sseManager.broadcast(["admins", userRoom], "order_updated", order);
+
+    // Send Status Update Email
+    try {
+      await sendEmail({
+        to: order.user.email,
+        subject: `RayEx Order Status Update: ${status.replace("_", " ").toUpperCase()}`,
+        html: getOrderStatusUpdateEmail(
+          order.user.name,
+          order.id,
+          status,
+          notes,
+        ),
+      });
+      console.log(
+        `✉️ Status update email sent successfully to ${order.user.email}`,
+      );
+    } catch (emailErr) {
+      console.error(
+        `⚠️ Failed to send status email to ${order.user.email}, but continuing...`,
+        emailErr,
+      );
+    }
 
     return res.json({
       success: true,
@@ -201,11 +226,29 @@ export const createOrder = async (req: Request, res: Response) => {
     } = req.body;
 
     // Validate required fields
-    if (!userEmail || !fromCurrencyId || !toCurrencyId || !fromAmount || !toAmount || !paymentMethodId || !exchangeRate) {
+    if (
+      !userEmail ||
+      !fromCurrencyId ||
+      !toCurrencyId ||
+      !fromAmount ||
+      !toAmount ||
+      !paymentMethodId ||
+      !exchangeRate
+    ) {
       return res.status(400).json({
         success: false,
         message: "Missing required fields",
       });
+    }
+
+    let recipientQrCodeUrl = null;
+
+    // Handle file upload to Cloudinary
+    if ((req as any).file) {
+      const file = (req as any).file;
+      const fileBase64 = `data:${file.mimetype};base64,${file.buffer.toString("base64")}`;
+      const uploadResult = await uploadImage(fileBase64);
+      recipientQrCodeUrl = uploadResult.secure_url;
     }
 
     // 1. Find the user
@@ -229,14 +272,15 @@ export const createOrder = async (req: Request, res: Response) => {
         toCurrencyId,
         toAmount: parseFloat(toAmount.toString()),
         paymentMethodId,
-        recipientName,
-        recipientBank,
-        recipientAccountNumber,
-        recipientSwift,
-        recipientWalletAddress,
+        recipientName: recipientName || null,
+        recipientBank: recipientBank || null,
+        recipientAccountNumber: recipientAccountNumber || null,
+        recipientSwift: recipientSwift || null,
+        recipientWalletAddress: recipientWalletAddress || null,
+        recipientQrCodeUrl: recipientQrCodeUrl || null,
         exchangeRate: parseFloat(exchangeRate.toString()),
         fee: 0,
-        notes,
+        notes: notes || null,
         status: "pending_payment",
       },
       include: {
@@ -255,15 +299,89 @@ export const createOrder = async (req: Request, res: Response) => {
     });
 
     // Emit Kafka event, WebSocket update, and SSE update
-    await emitEvent('orders', 'ORDER_CREATED', order);
-    
+    await emitEvent("orders", "ORDER_CREATED", order);
+
     const userRoom = `user_${user.email}`;
-    
+
     // Socket.io (legacy)
-    getIO().to('admins').to(userRoom).emit('new_order', order);
-    
+    getIO().to("admins").to(userRoom).emit("new_order", order);
+
     // SSE (new)
-    sseManager.broadcast(['admins', userRoom], 'new_order', order);
+    sseManager.broadcast(["admins", userRoom], "new_order", order);
+
+    // Send Creation Confirmation Email
+    try {
+      await sendEmail({
+        to: userEmail,
+        subject: "RayEx Order Confirmation",
+        html: getOrderCreatedEmail(
+          user.name,
+          order.id,
+          order.fromAmount,
+          order.fromCurrency.symbol,
+          order.toAmount,
+          order.toCurrency.symbol,
+        ),
+      });
+      console.log(`✉️ Order creation email sent successfully to ${userEmail}`);
+    } catch (emailErr) {
+      console.error(
+        `⚠️ Failed to send creation email to ${userEmail}, but continuing...`,
+        emailErr,
+      );
+    }
+
+    // Send Admin Notification Email
+    try {
+      const adminEmailSetting = await prisma.setting.findUnique({
+        where: { key: "notificationEmail" },
+      });
+      const adminEmail = adminEmailSetting?.value;
+
+      if (adminEmail) {
+        await sendEmail({
+          to: adminEmail,
+          subject: `RayEx Alert: New Exchange Request`,
+          html: `
+            <div style="font-family: sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 8px;">
+              <h2 style="color: #6d28d9; margin-top: 0;">New Order Created</h2>
+              <p>A new exchange order has just been submitted on RayEx by <strong>${user.name}</strong> (${user.email}).</p>
+              
+              <table style="width: 100%; border-collapse: collapse; margin: 20px 0; background-color: #f9fafb; border-radius: 6px;">
+                <tr>
+                  <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;"><strong>Order ID</strong></td>
+                  <td style="padding: 12px; border-bottom: 1px solid #e5e7eb; font-family: monospace;">${order.id}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;"><strong>Sending</strong></td>
+                  <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">${order.fromAmount} ${order.fromCurrency.code}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;"><strong>Receiving</strong></td>
+                  <td style="padding: 12px; border-bottom: 1px solid #e5e7eb;">${order.toAmount.toLocaleString()} ${order.toCurrency.code}</td>
+                </tr>
+                <tr>
+                  <td style="padding: 12px;"><strong>Method</strong></td>
+                  <td style="padding: 12px;">${order.paymentMethod.name}</td>
+                </tr>
+              </table>
+              
+              <div style="text-align: center; margin-top: 30px;">
+                <a href="${process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(",")[0] : "http://localhost:3000"}/admin/orders" 
+                   style="background-color: #6d28d9; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+                  View in Admin Panel
+                </a>
+              </div>
+            </div>
+          `,
+        });
+        console.log(
+          `✉️ Admin notification email sent successfully to ${adminEmail}`,
+        );
+      }
+    } catch (adminErr) {
+      console.error(`⚠️ Failed to send admin notification email:`, adminErr);
+    }
 
     return res.status(201).json({
       success: true,
