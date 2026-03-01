@@ -47,7 +47,9 @@ export const sendEmail = async ({
       throw new Error(data.error.message);
     }
 
-    console.log("Resend Message sent: %s", data.data?.id);
+    console.log(
+      `✅ [EMAIL SENT] To: ${JSON.stringify(to)} | Subject: "${subject}" | Resend ID: ${data.data?.id}`,
+    );
     return data;
   } catch (error) {
     console.error("Error sending email via Resend:", error);
