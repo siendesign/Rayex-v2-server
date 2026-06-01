@@ -1,15 +1,11 @@
-
-name: Node.js CI
+name: RayEx Server CI/CD
 
 on:
   push:
-    branches: [ "main" ]
-  pull_request:
-    branches: [ "main" ]
+    branches: [ "main" ] # Removed pull_request trigger for security on self-hosted runners
 
 jobs:
   build:
-
     runs-on: self-hosted
 
     strategy:
@@ -17,39 +13,51 @@ jobs:
         node-version: [24.13.0]
 
     steps:
-    - uses: actions/checkout@v4
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
-        cache: 'npm'
-    - name: Create .env file
-      run: |
-        cat <<EOF > .env
-        PORT=${{ secrets.PORT }}
-        NODE_ENV=${{ secrets.NODE_ENV }}
-        JWT_SECRET=${{ secrets.JWT_SECRET }}
-        CORS_ORIGIN=${{ secrets.CORS_ORIGIN }}
+      - uses: actions/checkout@v4
 
-        CLERK_SECRET_KEY=${{ secrets.CLERK_SECRET_KEY }}
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
 
-        DATABASE_URL=${{ secrets.DATABASE_URL }}
+      - name: Create .env file
+        run: |
+          cat <<EOF > .env
+          PORT=${{ secrets.PORT }}
+          NODE_ENV=${{ secrets.NODE_ENV }}
+          JWT_SECRET=${{ secrets.JWT_SECRET }}
+          CORS_ORIGIN=${{ secrets.CORS_ORIGIN }}
+          CLERK_SECRET_KEY=${{ secrets.CLERK_SECRET_KEY }}
+          DATABASE_URL=${{ secrets.DATABASE_URL }}
+          CLOUDINARY_CLOUD_NAME=${{ secrets.CLOUDINARY_CLOUD_NAME }}
+          CLOUDINARY_API_KEY=${{ secrets.CLOUDINARY_API_KEY }}
+          CLOUDINARY_API_SECRET=${{ secrets.CLOUDINARY_API_SECRET }}
+          SMTP_HOST=${{ secrets.SMTP_HOST }}
+          SMTP_PORT=${{ secrets.SMTP_PORT }}
+          SMTP_SECURE=${{ secrets.SMTP_SECURE }}
+          SMTP_USER=${{ secrets.SMTP_USER }}
+          SMTP_PASSWORD=${{ secrets.SMTP_PASSWORD }}
+          EMAIL_FROM_NAME=${{ secrets.EMAIL_FROM_NAME }}
+          EMAIL_FROM_ADDRESS=${{ secrets.EMAIL_FROM_ADDRESS }}
+          RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}
+          EOF
 
-        CLOUDINARY_CLOUD_NAME=${{ secrets.CLOUDINARY_CLOUD_NAME }}
-        CLOUDINARY_API_KEY=${{ secrets.CLOUDINARY_API_KEY }}
-        CLOUDINARY_API_SECRET=${{ secrets.CLOUDINARY_API_SECRET }}
+      - run: npm ci
 
-        SMTP_HOST=${{ secrets.SMTP_HOST }}
-        SMTP_PORT=${{ secrets.SMTP_PORT }}
-        SMTP_SECURE=${{ secrets.SMTP_SECURE }}
-        SMTP_USER=${{ secrets.SMTP_USER }}
-        SMTP_PASSWORD=${{ secrets.SMTP_PASSWORD }}
+      - name: Generate Prisma Client
+        run: npx prisma generate
 
-        EMAIL_FROM_NAME=${{ secrets.EMAIL_FROM_NAME }}
-        EMAIL_FROM_ADDRESS=${{ secrets.EMAIL_FROM_ADDRESS }}
+      - run: npm run build --if-present
 
-        RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}
-        EOF
-    - run: npm ci
-    - run: npm run build --if-present
+      - name: Run Database Migrations
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+      - name: Reload PM2 process
+        run: |
+          # Use pm2 reload for zero-downtime reloads if already running, otherwise start it
+          pm2 reload rayex-backend || pm2 start dist/index.js --name "rayex-backend"
+          pm2 save
  
