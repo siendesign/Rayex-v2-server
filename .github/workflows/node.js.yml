@@ -43,6 +43,9 @@ jobs:
           RESEND_API_KEY=${{ secrets.RESEND_API_KEY }}
           EOF
 
+      - name: Start Docker Services (Redis, ZooKeeper, Kafka)
+        run: docker compose up -d || docker-compose up -d
+
       - run: npm ci
 
       - name: Generate Prisma Client
